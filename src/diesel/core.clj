@@ -33,12 +33,12 @@
   (and (number? expr)
        (zero? expr)))
 
-(defn of-form? [expr proc-or-sym]
-  (if (fn? proc-or-sym)
-    (proc-or-sym expr)
+(defn of-form? [expr proc-or-op]
+  (if (fn? proc-or-op)
+    (proc-or-op expr)
     (and (seq? expr)
          (not (empty? expr))
-         (= (first expr) proc-or-sym))))
+         (= (first expr) proc-or-op))))
 
 (defn remove-dispatch-form-cruft
   "Our dispatch forms have `=>` to make them pretty.
@@ -50,7 +50,7 @@ and effectively turns `[a => b]` into `[a b]`."
 (defmacro definterp [name formals & dispatches]
   (let [dispatches (map remove-dispatch-form-cruft dispatches)]
     `(defmulti ~name
-       (fn ~(into [] (concat ['expr] formals))
+       (fn intepreter-fn ~(into [] (concat ['expr] formals))
          (loop [forms# [~@dispatches]]
            (when forms#
              (let [f# (first forms#)]
@@ -62,23 +62,23 @@ and effectively turns `[a => b]` into `[a b]`."
 
 
 (macroexpand-1
-'(definterp test []
+'(definterp test [x y]
    ['add => :add]
    ['sub => :sub]
    [div? => :div]))
 
-(definterp test []
+(definterp test [x y]
    ['add => :add]
    ['sub => :sub]
    [div? => :div])
 
-(defmethod test :add [expr]
-  (println expr))
+(defmethod test :add [expr x y]
+  (println expr x y))
 
-(defmethod test :unknown-operator [expr]
+(defmethod test :unknown-operator [expr x y]
   (str "Unknown handler for `" (first expr) "` when handling `" expr "`"))
 
-(test '(div 5 6 8))
+(test '(div 6 8) :hi :hello )
 
 
 ;; (defmulti interp [e]
