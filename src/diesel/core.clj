@@ -29,33 +29,46 @@
 ;;              sub => :sub
 ;;              ~div => div-expr)
 
-(defn div? [x y]
-  (zero? y))
+(defn div? [expr]
+  (and (number? expr)
+       (zero? expr)))
+
+(defn of-form? [expr proc-or-sym]
+  (if (fn? proc-or-sym)
+    (proc-or-sym expr)
+    (and (seq? expr)
+         (not (empty? expr))
+         (= (first expr) proc-or-sym))))
+
+(defn remove-dispatch-cruft [dispatch-expr]
+  [(first dispatch-expr) (last dispatch-expr)])
 
 (defmacro definterp [name formals & dispatches]
-  ;; check that dispatches is divisible by 3
-  (let [dispatches (map #(identity `['~(nth % 0) ~(nth % 2)])
-                        (partition 3 dispatches))
-        dispatches (into [] dispatches)]
-    `(defmulti ~name
-       (fn ~(into [] (concat ['expr] formals))
-         (if (list? ~'expr)
+  (let [dispatches (map remove-dispatch-cruft dispatches)]
+  `(defmulti ~name
+     (fn ~(into [] (concat ['expr] formals))
+       (loop [forms# [~@dispatches]]
+         (if forms#
+           (let [f# (first forms#)]
+             (if (of-form? ~'expr (first f#))
+               (last f#)
+               (recur (next forms#))))
            (do
-             (println "hello!")
-             (expression-dispatch ~'expr ~dispatches))
-           ~'expr)))))
+             ;;(println ~'expr)
+             (str "Unknown handler for " (first ~'expr)
+                  "when handling " ~'expr))))))))
 
 
 (macroexpand-1
 '(definterp test []
-   add => :add
-   sub => :sub
-   #(div? %) => :div))
+   ['add => :add]
+   ['sub => :sub]
+   [div? => :div]))
 
 (definterp test []
-  add => :add
-  sub => :sub
-  #(div? %) => :div)
+   ['add => :add]
+   ['sub => :sub]
+   [div? => :div])
 
 (defmethod test :add [expr]
   (println expr))
