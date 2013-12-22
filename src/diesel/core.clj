@@ -40,23 +40,25 @@
          (not (empty? expr))
          (= (first expr) proc-or-sym))))
 
-(defn remove-dispatch-cruft [dispatch-expr]
+(defn remove-dispatch-form-cruft
+  "Our dispatch forms have `=>` to make them pretty.
+Since that isn't valid syntax, this removes that value
+and effectively turns `[a => b]` into `[a b]`."
+  [dispatch-expr]
   [(first dispatch-expr) (last dispatch-expr)])
 
 (defmacro definterp [name formals & dispatches]
-  (let [dispatches (map remove-dispatch-cruft dispatches)]
-  `(defmulti ~name
-     (fn ~(into [] (concat ['expr] formals))
-       (loop [forms# [~@dispatches]]
-         (if forms#
-           (let [f# (first forms#)]
-             (if (of-form? ~'expr (first f#))
-               (last f#)
-               (recur (next forms#))))
-           (do
-             ;;(println ~'expr)
-             (str "Unknown handler for " (first ~'expr)
-                  "when handling " ~'expr))))))))
+  (let [dispatches (map remove-dispatch-form-cruft dispatches)]
+    `(defmulti ~name
+       (fn ~(into [] (concat ['expr] formals))
+         (loop [forms# [~@dispatches]]
+           (when forms#
+             (let [f# (first forms#)]
+               (if (of-form? ~'expr (first f#))
+                 (last f#)
+                 (recur (next forms#)))))))
+       :default :unknown-operator)))
+
 
 
 (macroexpand-1
@@ -72,6 +74,9 @@
 
 (defmethod test :add [expr]
   (println expr))
+
+(defmethod test :unknown-operator [expr]
+  (str "Unknown handler for `" (first expr) "` when handling `" expr "`"))
 
 (test '(div 5 6 8))
 
