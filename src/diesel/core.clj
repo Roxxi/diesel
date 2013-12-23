@@ -34,17 +34,14 @@ and effectively turns `[a => b]` into `[a b]`."
            (if (list? ~'expr)
              (or (ordered-expr-interp ~'expr ~dispatch-mappings)
                  :unknown-operator)
-             :literal-value)))
-       (defmethod ~name :literal-value ~expr+formals
+             :const-value)))
+       (defmethod ~name :const-value ~expr+formals
          (if (symbol? ~'expr)
            @(resolve ~'expr)
            ~'expr))
        (defmethod ~name :unknown-operator ~expr+formals
          (str "Unknown handler for `" ~'expr
               "` when handling `" ~'expr "`")))))
-
-
-
 
 (def special-ops #{'+ '- '/ '*})
 
@@ -60,27 +57,24 @@ and effectively turns `[a => b]` into `[a b]`."
 (definterp my-interp []
   ['add => :add]
   ['sub => :sub]
+  ['div => :div]
   [special-op? => :special-op])
 
-(defn my-interp-add-args [expr]
-  (rest expr))
+(defmethod my-interp :add [[_ & args]]
+  (apply +  (map my-interp args)))
 
-(defmethod my-interp :add [expr]
-  (apply +  (map my-interp (my-interp-add-args expr))))
+(defmethod my-interp :sub [[_ & args]]
+  (if (= (count args) 1)
+    (my-interp (first args))
+    (apply - (map my-interp args))))
 
-(def my-interp-sub-args my-interp-add-args)
+(defmethod my-interp :div [[_ dividend divisor]]
+  (/ dividend divisor))
 
-(defmethod my-interp :sub [expr]
-  (let [args (my-interp-sub-args expr)]
-    (if (= (count args) 1)
-      (my-interp (first args))
-      (apply - (map my-interp (my-interp-sub-args expr))))))
-
-(defmethod my-interp :special-op [expr]
-  (let [args (my-interp-sub-args expr)]
-    (if (= (count args) 1)
-      (my-interp (first args))
-      (apply @(resolve (first expr)) (map my-interp (my-interp-sub-args expr))))))
+(defmethod my-interp :special-op [[op & args]]
+  (if (= (count args) 1)
+    (my-interp (first args))
+    (apply @(resolve op) (map my-interp args))))
 
 (def x 10)
 (my-interp '(add 6 7))
@@ -90,9 +84,4 @@ and effectively turns `[a => b]` into `[a b]`."
 
 (my-interp '(add 26))
 
-
-
-
-;; (defmulti interp [e]
-;;   (cond
-;;    (list? e) (interp
+(my-interp '(div 10 20))
